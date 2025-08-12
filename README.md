@@ -158,9 +158,7 @@ helm install n8n oci://8gears.container-registry.com/library/n8n \
 > **Acción Requerida:** Configurar DNS
 > 
 > 1. Obtén la IP externa del Ingress:
->    ```bash
 >    kubectl get services -n default
->    ```
 > 
 > 2. Ve a tu proveedor de DNS (ej. Amazon Route 53) y crea un registro `A` que apunte `n8n.tu-dominio.com` a esa IP.
 
