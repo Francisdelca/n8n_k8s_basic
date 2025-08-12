@@ -44,6 +44,12 @@ persistence:
   storageClass: "microk8s-hostpath"
 ```
 
+### Instalación con Helm
+
+```bash
+helm install my-n8n oci://8gears.container-registry.com/library/n8n --version 1.0.0
+```
+
 ### Configuración para Producción
 
 Para entornos de producción, utiliza esta configuración más robusta:
@@ -87,12 +93,6 @@ ingress:
           pathType: Prefix
           serviceName: n8n-n8n
           servicePort: 5678
-```
-
-### Instalación con Helm
-
-```bash
-helm install my-n8n oci://8gears.container-registry.com/library/n8n --version 1.0.0
 ```
 
 ## 2. Instalación de Ingress Controller y Cert-Manager
