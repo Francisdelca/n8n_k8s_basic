@@ -149,8 +149,7 @@ kubectl apply -f letsencrypt-issuer.yaml
 
 ```bash
 helm install n8n oci://8gears.container-registry.com/library/n8n \
-  --version 1.0.10 \
-  -f n8n-production-values.yaml
+  --version 1.0.10
 ```
 
 ### Configuración de DNS
