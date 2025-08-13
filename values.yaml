@@ -1,33 +1,216 @@
 image:
   repository: n8nio/n8n
   pullPolicy: IfNotPresent
-  tag: "latest" # Última versión estable
+  tag: "latest"
+
+nameOverride: ""
+fullnameOverride: ""
+
+ingress:
+  enabled: false
+  className: ""
+  hosts:
+    - host: workflow.example.com
+      paths: []
+  tls:
+    - hosts:
+        - workflow.example.com
+      secretName: host-domain-cert
 
 main:
+  config:
+    n8n:
+      db:
+        type: postgresdb
+        postgresdb:
+          host: 10.0.0.100
+          port: 5432
+          database: n8n
+          user: n8n
+      redis:
+        host: 10.0.0.101
+        port: 6379
+      generic:
+        host: 10.0.0.102:5678
+      host: 10.0.0.102:5678
+      protocol: http
+
+  secret:
+    n8n:
+      encryption_key: "dummy-encryption-key-32-characters-long-12345"
+      db:
+        postgresdb:
+          password: "dummy-postgres-password-123"
+      redis:
+        password: "dummy-redis-password-456"
+
+  persistence:
+    enabled: true
+    type: dynamic
+    size: 5Gi
+    accessModes:
+      - ReadWriteOnce
+    storageClass: "microk8s-hostpath"
+
+  replicaCount: 1
+
+  deploymentStrategy:
+    type: "Recreate"
+
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+
+  securityContext: {}
+
   service:
     type: NodePort
     port: 5678
-config:
-  DB_TYPE: "postgresdb"
-  DB_POSTGRESDB_HOST: "host.docker.internal"
-  DB_POSTGRESDB_DATABASE: "n8n"
-  DB_POSTGRESDB_USER: "n8n"
-  GENERIC_HOST: "localhost:5678"
-  N8N_HOST: "localhost:5678"
-  N8N_PROTOCOL: "http"
-  REDIS_HOST: "host.docker.internal"
-  REDIS_PORT: 6379
-secret:
-  DB_POSTGRESDB_PASSWORD: "441377" # ¡Cámbialo!
-  REDIS_PASSWORD: "441377" # ¡Cámbialo!
-persistence:
-  enabled: true
-  size: 10Gi
-  accessMode: ReadWriteOnce
-  storageClass: "microk8s-hostpath"
+    annotations: {}
 
-autoscaling:
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1500m"
+      memory: "2Gi"
+
+  autoscaling:
     enabled: true
     minReplicas: 1
     maxReplicas: 3
     targetCPUUtilizationPercentage: 20
+
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+
+  readinessProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+    successThreshold: 1
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+worker:
+  enabled: false
+  config: {}
+  secret: {}
+  extraEnv: {}
+  concurrency: 10
+
+  persistence:
+    enabled: false
+    type: emptyDir
+    accessModes:
+      - ReadWriteOnce
+    size: 1Gi
+
+  replicaCount: 1
+  deploymentStrategy:
+    type: "Recreate"
+
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+
+  securityContext: {}
+
+  service:
+    type: ClusterIP
+    port: 80
+    annotations: {}
+
+  resources: {}
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 100
+    targetCPUUtilizationPercentage: 80
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+webhook:
+  enabled: false
+  config: {}
+  secret: {}
+  extraEnv: {}
+
+  persistence:
+    enabled: false
+    type: emptyDir
+    accessModes:
+      - ReadWriteOnce
+    size: 1Gi
+
+  replicaCount: 1
+  deploymentStrategy:
+    type: "Recreate"
+
+  nameOverride: ""
+  fullnameOverride: ""
+
+  serviceAccount:
+    create: true
+    annotations: {}
+    name: ""
+
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+
+  securityContext: {}
+
+  service:
+    type: ClusterIP
+    port: 80
+    annotations: {}
+
+  resources: {}
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 100
+    targetCPUUtilizationPercentage: 80
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+extraManifests: []
+extraTemplateManifests: []
+
+valkey:
+  enabled: false

@@ -1,79 +1,14 @@
-# EJEMPLO: ClusterIssuer para Let's Encrypt - PRODUCCIÓN
-# Este archivo es solo un ejemplo. Debes crear tu propio archivo con tus datos reales.
-
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-spec:
-  acme:
-    # ⚠️ CAMBIA ESTO por tu email real
-    email: tu-email@tudominio.com
-    
-    # Servidor de Let's Encrypt para producción
-    server: https://acme-v02.api.letsencrypt.org/directory
-    
-    # Clave privada para la cuenta ACME
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    
-    # Solucionador HTTP-01 para validación
-    solvers:
-      - http01:
-          ingress:
-            class: nginx
-
----
-# EJEMPLO: ClusterIssuer para Let's Encrypt - STAGING (para pruebas)
-# Usar este primero para probar la configuración
-
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: letsencrypt-staging
 spec:
   acme:
-    # ⚠️ CAMBIA ESTO por tu email real
-    email: tu-email@tudominio.com
-    
-    # Servidor de Let's Encrypt para staging (sin límites de rate)
+    email: tu-email@dominio.com
     server: https://acme-staging-v02.api.letsencrypt.org/directory
-    
-    # Clave privada para la cuenta ACME
     privateKeySecretRef:
       name: letsencrypt-staging
-    
-    # Solucionador HTTP-01 para validación
     solvers:
       - http01:
           ingress:
             class: nginx
-
----
-# 📋 INSTRUCCIONES DE USO:
-# 
-# 1. COPIA este archivo y renómbralo:
-#    cp letsencrypt-example.yaml letsencrypt-issuer.yaml
-#
-# 2. EDITA el archivo con tus datos reales:
-#    - Cambia tu-email@tudominio.com por tu email real
-#    - Verifica que el nombre del ingress class sea correcto
-#
-# 3. INSTALA ANTES de n8n en producción:
-#    kubectl apply -f letsencrypt-issuer.yaml
-#
-# 4. VERIFICA que cert-manager esté funcionando:
-#    kubectl get clusterissuer
-#
-# 5. PARA PRODUCCIÓN:
-#    - Usar letsencrypt-prod en values-prod.yaml
-#    - Los certificados serán válidos para navegadores
-#
-# 6. PARA PRUEBAS:
-#    - Usar letsencrypt-staging en values-prod.yaml
-#    - Los certificados serán de prueba (no válidos para navegadores)
-#
-# 7. REQUISITOS:
-#    - cert-manager instalado en el cluster
-#    - nginx-ingress controller funcionando
-#    - Dominio configurado y apuntando al cluster

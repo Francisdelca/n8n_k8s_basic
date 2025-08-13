@@ -1,292 +1,330 @@
-# n8n en Kubernetes
+# n8n en Kubernetes - Guía de Despliegue en Producción
 
-Este repositorio contiene configuraciones de Helm para desplegar n8n en Kubernetes, con configuraciones optimizadas para desarrollo local y producción.
+Este repositorio contiene la configuración para desplegar [n8n](https://n8n.io/) en Kubernetes usando el chart de Helm oficial de [open-8gears](https://artifacthub.io/packages/helm/open-8gears/n8n).
 
-## 📁 Archivos de Configuración
+## 📋 Prerrequisitos
 
-### 1. `values.yaml` - Configuración Local (Desarrollo)
-- **Uso**: Desarrollo local con acceso interno del cluster
-- **Servicio**: NodePort (puerto 5678)
-- **Base de datos**: PostgreSQL y Redis externos (Docker)
-- **Versión**: Última versión estable de n8n
-- **Características**: Configuración simple, autoscaling básico
+- Kubernetes cluster 1.19+
+- Helm 3.0+
+- kubectl configurado
+- cert-manager instalado (para certificados SSL)
+- StorageClass configurado en el cluster
 
-### 2. `values-prod.yaml` - Configuración de Producción
-- **Uso**: Entorno de producción con alta disponibilidad
-- **Servicio**: ClusterIP + Ingress con SSL
-- **Base de datos**: PostgreSQL y Redis gestionados en K8s
-- **Versión**: Última versión estable de n8n
-- **Características**: SSL, autoscaling, múltiples réplicas, seguridad robusta
+## 🚀 Flujo de Despliegue Estándar
 
-## 🚀 Instalación Rápida
+### 1. Configuración del values.yaml
 
-### Usando Make (Recomendado)
+Antes de instalar, debes configurar las variables críticas en `values.yaml`:
 
-```bash
-# Ver todos los comandos disponibles
-make help
+#### Variables Obligatorias
 
-# Configurar entorno de desarrollo
-make dev-setup
-
-# Instalar n8n local
-make install-local
-
-# Ver estado
-make status
-
-# Ver logs
-make logs
-
-# Port-forward para acceso local
-make port-forward
+**Base de Datos PostgreSQL:**
+```yaml
+main:
+  config:
+    n8n:
+      db:
+        type: postgresdb
+        postgresdb:
+          host: TU_HOST_POSTGRES
+          port: 5432
+          database: n8n
+          user: n8n
+  secret:
+    n8n:
+      db:
+        postgresdb:
+          password: "TU_PASSWORD_POSTGRES"
 ```
 
-### Para Producción
-
-```bash
-# Configurar entorno de producción
-make prod-setup
-
-# Editar .env con tus valores reales
-nano .env
-
-# Validar configuración
-make validate-env
-
-# Instalar n8n en producción
-make install-prod
+**Redis:**
+```yaml
+main:
+  config:
+    n8n:
+      redis:
+        host: TU_HOST_REDIS
+        port: 6379
+  secret:
+    n8n:
+      redis:
+        password: "TU_PASSWORD_REDIS"
 ```
 
-## 🔧 Configuración con Variables de Entorno
-
-### 1. Configurar Variables
-
-```bash
-# Copiar archivo de ejemplo
-cp env.example .env
-
-# Editar con tus valores reales
-nano .env
+**Clave de Encriptación:**
+```yaml
+main:
+  secret:
+    n8n:
+      encryption_key: "GENERA_UNA_CLAVE_DE_32_CARACTERES_ALEATORIA"
 ```
 
-### 2. Variables Críticas a Configurar
-
-```bash
-# Dominio y SSL
-N8N_DOMAIN=n8n.tudominio.com
-N8N_EMAIL=tu-email@tudominio.com
-
-# Base de datos
-DB_PASSWORD=tu-password-postgres-seguro
-REDIS_PASSWORD=tu-password-redis-seguro
-
-# Seguridad
-N8N_ENCRYPTION_KEY=tu-clave-de-32-caracteres
-N8N_ADMIN_PASSWORD=tu-password-admin-seguro
-
-# Storage
-STORAGE_CLASS=fast-ssd
+**Host y Protocolo:**
+```yaml
+main:
+  config:
+    n8n:
+      host: "tu-dominio.com"
+      protocol: https
 ```
 
-### 3. Generar Configuración
+#### Configuración de Ingress (Opcional)
 
-```bash
-# Generar values-prod.yaml desde .env
-make generate-prod
-
-# O manualmente
-./generate-prod-config.sh
+Para acceso externo con SSL:
+```yaml
+ingress:
+  enabled: true
+  className: "nginx"  # o tu clase de ingress
+  hosts:
+    - host: tu-dominio.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - hosts:
+        - tu-dominio.com
+      secretName: n8n-tls
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 ```
 
-## 🗄️ Bases de Datos
+#### Autoscaling (Opcional)
 
-### Para Desarrollo Local
-
-#### PostgreSQL
-```bash
-docker run --name postgres-n8n \
-  -e POSTGRES_PASSWORD=441377 \
-  -e POSTGRES_USER=n8n \
-  -e POSTGRES_DB=n8n \
-  -p 5432:5432 \
-  -d postgres:15
+```yaml
+main:
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 20
 ```
 
-#### Redis
+**Nota**: El autoscaling se puede configurar aquí o gestionar manualmente después del despliegue.
+
+### 2. Instalación del Servicio
+
 ```bash
-docker run --name redis-n8n \
-  -e REDIS_PASSWORD=441377 \
-  -p 6379:6379 \
-  -d redis:7-alpine
+helm install n8n oci://8gears.container-registry.com/library/n8n --version 1.0.0 -f values.yaml
 ```
 
-### Para Producción
-- Usar servicios gestionados (AWS RDS, GCP Cloud SQL, Azure Database)
-- O crear deployments separados de PostgreSQL y Redis en el cluster
+Este comando instala directamente desde el registro OCI de 8gears e inicia el servicio.
 
-## ⚙️ Configuración Manual
+### 3. Diagnóstico del Despliegue
 
-### Variables Importantes a Cambiar
-
-#### En `values-prod.yaml`:
-- `n8n.tudominio.com` → Tu dominio real
-- `your-32-character-encryption-key-here` → Clave de encriptación segura
-- `tu-password-postgres-seguro` → Contraseña PostgreSQL segura
-- `tu-password-redis-seguro` → Contraseña Redis segura
-- `tu-password-admin-seguro` → Contraseña de administrador
-- `fast-ssd` → Tu storage class de producción
-
-#### En `values.yaml`:
-- `microk8s-hostpath` → Tu storage class local
-- Contraseñas de base de datos (opcional para desarrollo)
-
-### Storage Classes
-
-#### MicroK8s
+#### Verificar Estado de los Pods
 ```bash
-microk8s enable storage
-# Usar: microk8s-hostpath
+kubectl get pods -l app.kubernetes.io/name=n8n
+kubectl describe pod -l app.kubernetes.io/name=n8n
 ```
 
-#### Minikube
+#### Verificar Servicios
 ```bash
-# Usar: standard
+kubectl get svc -l app.kubernetes.io/name=n8n
+kubectl get endpoints -l app.kubernetes.io/name=n8n
 ```
 
-#### Otros clusters
+#### Verificar HPA (si está habilitado)
 ```bash
-kubectl get storageclass
-# Usar el que corresponda a tu cluster
+kubectl get hpa
+kubectl describe hpa n8n
 ```
 
-## 🔒 Seguridad
-
-### Para Desarrollo
-- Autenticación básica deshabilitada
-- Logs en modo debug
-- Recursos mínimos
-- Acceso directo sin SSL
-
-### Para Producción
-- Autenticación básica habilitada
-- SSL/TLS obligatorio
-- Logs en modo info
-- Recursos limitados y requests
-- Pods ejecutándose como usuario no-root
-- Clave de encriptación configurada
-
-## 📊 Monitoreo y Gestión
-
-### Comandos Útiles
-
+#### Logs de la Aplicación
 ```bash
-# Ver estado completo
-make status
-
-# Ver logs en tiempo real
-make logs
-
-# Port-forward para acceso local
-make port-forward
-
-# Desinstalar
-make uninstall-local    # Para desarrollo
-make uninstall-prod     # Para producción
-
-# Limpiar archivos generados
-make clean
+kubectl logs -l app.kubernetes.io/name=n8n -f
 ```
 
-### Ver Estado Manual
+### 4. Verificación del Dominio y SSL
 
+#### Verificar Ingress
 ```bash
-# Ver pods
-kubectl get pods
-
-# Ver servicios
-kubectl get svc
-
-# Ver ingress (solo producción)
 kubectl get ingress
-
-# Ver eventos
-kubectl get events --sort-by=.metadata.creationTimestamp
+kubectl describe ingress n8n
 ```
 
-## 🔄 Actualizaciones
+#### Configurar Certificado SSL (si usas cert-manager)
 
-### Actualizar n8n
+Aplica el ClusterIssuer de Let's Encrypt:
 ```bash
-# Cambiar tag en values.yaml
-helm upgrade n8n-local . -f values.yaml
+kubectl apply -f letsencrypt-example.yaml
 ```
 
-### Actualizar configuración
+Verifica el estado del certificado:
 ```bash
-# Aplicar cambios en values
-helm upgrade n8n-local . -f values.yaml
+kubectl get certificaterequests
+kubectl get certificates
 ```
 
-## 🗑️ Desinstalación
+### 5. Pruebas de Carga
+
+El directorio `locust_test/` contiene scripts para probar la carga de tu instancia de n8n:
 
 ```bash
-# Desinstalar release
-make uninstall-local
-
-# Limpiar PVCs (opcional)
-kubectl delete pvc -l app.kubernetes.io/instance=n8n-local
+cd locust_test
+pip install -r requirements.txt
+locust -f locustfile.py --host=https://tu-dominio.com
 ```
 
-## 🐛 Troubleshooting
+Consulta el README de `locust_test/` para más detalles sobre las pruebas de carga.
+
+## ⚙️ Configuraciones Adicionales del values.yaml
+
+### Configuración de Base
+
+El archivo `values.yaml` está configurado para un entorno de producción con:
+
+- **Base de datos**: PostgreSQL externa
+- **Cache**: Redis externo
+- **Persistencia**: StorageClass dinámico (5Gi)
+- **Recursos**: 500m CPU / 1Gi RAM (requests), 1500m CPU / 2Gi RAM (limits)
+- **Health checks**: Configurados para `/healthz`
+
+## 🔐 Configuración de SSL con Let's Encrypt
+
+### 1. Instalar cert-manager
+
+```bash
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+```
+
+### 2. Configurar ClusterIssuer
+
+Modifica `letsencrypt-example.yaml` con tu email:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: tu-email@dominio.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+```
+
+### 3. Aplicar la configuración
+
+```bash
+kubectl apply -f letsencrypt-example.yaml
+```
+
+## 📊 Monitoreo y Escalado
+
+### Verificar el estado del despliegue
+
+```bash
+kubectl get pods -l app.kubernetes.io/name=n8n
+kubectl get svc -l app.kubernetes.io/name=n8n
+kubectl get ingress -l app.kubernetes.io/name=n8n
+```
+
+### Logs de la aplicación
+
+```bash
+kubectl logs -l app.kubernetes.io/name=n8n -f
+```
+
+### Escalado manual
+
+```bash
+kubectl scale deployment n8n --replicas=3
+```
+
+## 🔧 Configuraciones Avanzadas
+
+### Workers (Procesamiento en Background)
+
+Para habilitar workers para procesamiento asíncrono:
+
+```yaml
+worker:
+  enabled: true
+  replicaCount: 2
+  concurrency: 10
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+```
+
+### Webhooks
+
+Para habilitar webhooks:
+
+```yaml
+webhook:
+  enabled: true
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+```
+
+### Persistencia Personalizada
+
+```yaml
+main:
+  persistence:
+    storageClass: "tu-storage-class"
+    size: "10Gi"
+    accessModes:
+      - ReadWriteMany  # Para múltiples nodos
+```
+
+## 🧪 Pruebas de Carga
+
+El directorio `locust_test/` contiene scripts para probar la carga de tu instancia de n8n:
+
+```bash
+cd locust_test
+pip install -r requirements.txt
+locust -f locustfile.py --host=http://tu-dominio.com
+```
+
+## 🚨 Troubleshooting
 
 ### Problemas Comunes
 
-#### Pod no inicia
-```bash
-# Ver detalles del pod
-kubectl describe pod <pod-name>
+1. **Pods no inician**: Verificar recursos del cluster y StorageClass
+2. **Error de conexión a BD**: Verificar credenciales y conectividad de red
+3. **SSL no funciona**: Verificar cert-manager y ClusterIssuer
+4. **Persistencia falla**: Verificar StorageClass y permisos
 
-# Ver logs
-kubectl logs <pod-name>
-```
-
-#### Problemas de conectividad a base de datos
-- Verificar que PostgreSQL y Redis estén corriendo
-- Verificar credenciales en secrets
-- Verificar configuración de red
-
-#### Problemas de persistencia
-- Verificar storage class disponible
-- Verificar permisos de PVC
-
-### Validar Configuración
+### Comandos de Diagnóstico
 
 ```bash
-# Validar variables de entorno
-make validate-env
+# Verificar eventos
+kubectl get events --sort-by='.lastTimestamp'
 
-# Ver estado del deployment
-make status
+# Verificar configuración del pod
+kubectl describe pod -l app.kubernetes.io/name=n8n
+
+# Verificar logs de cert-manager
+kubectl logs -n cert-manager -l app=cert-manager
 ```
 
 ## 📚 Recursos Adicionales
 
 - [Documentación oficial de n8n](https://docs.n8n.io/)
-- [Chart de Helm n8n](https://github.com/8gears/n8n-helm-chart)
-- [Documentación de Kubernetes](https://kubernetes.io/docs/)
-- [Documentación de Helm](https://helm.sh/docs/)
+- [Chart de Helm en ArtifactHub](https://artifacthub.io/packages/helm/open-8gears/n8n)
+- [Documentación de cert-manager](https://cert-manager.io/docs/)
+- [Guía de Kubernetes Ingress](https://kubernetes.io/docs/concepts/services-networking/ingress/)
 
 ## 🤝 Contribuciones
 
-Las contribuciones son bienvenidas. Por favor:
-
-1. Fork el repositorio
-2. Crea una rama para tu feature
-3. Commit tus cambios
-4. Push a la rama
-5. Abre un Pull Request
+Las contribuciones son bienvenidas. Por favor, abre un issue o pull request para sugerencias y mejoras.
 
 ## 📄 Licencia
 
-Este proyecto está bajo la licencia MIT.
+Este proyecto está bajo la misma licencia que n8n.
