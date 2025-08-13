@@ -1,33 +1,33 @@
+image:
+  repository: n8nio/n8n
+  pullPolicy: IfNotPresent
+  tag: "latest" # Última versión estable
+
 main:
   service:
-    type: ClusterIP
+    type: NodePort
     port: 5678
-  config:
-    DB_TYPE: "postgresdb"
-    DB_POSTGRESDB_HOST: "aqui-va-el-hostname-de-tu-rds..."
-    DB_POSTGRESDB_DATABASE: "n8n"
-    DB_POSTGRESDB_USER: "n8n"
-    DB_POSTGRESDB_PORT: 5432
-    REDIS_HOST: "aqui-va-el-hostname-de-tu-elasticache..."
-    REDIS_PORT: 6379
-  secret:
-    DB_POSTGRESDB_PASSWORD: "aqui-va-la-contrasena-segura-de-rds"
-    REDIS_PASSWORD: "aqui-va-la-contrasena-segura-de-redis"
-postgresql:
-  enabled: false
-redis:
-  enabled: false
-ingress:
+config:
+  DB_TYPE: "postgresdb"
+  DB_POSTGRESDB_HOST: "host.docker.internal"
+  DB_POSTGRESDB_DATABASE: "n8n"
+  DB_POSTGRESDB_USER: "n8n"
+  GENERIC_HOST: "localhost:5678"
+  N8N_HOST: "localhost:5678"
+  N8N_PROTOCOL: "http"
+  REDIS_HOST: "host.docker.internal"
+  REDIS_PORT: 6379
+secret:
+  DB_POSTGRESDB_PASSWORD: "441377" # ¡Cámbialo!
+  REDIS_PASSWORD: "441377" # ¡Cámbialo!
+persistence:
   enabled: true
-  className: "nginx"
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: "letsencrypt-staging"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-  hosts:
-    - host: "n8n.tu-dominio.com"
-      paths:
-        - path: /
-          pathType: Prefix
-          serviceName: n8n-n8n
-          servicePort: 5678
+  size: 10Gi
+  accessMode: ReadWriteOnce
+  storageClass: "microk8s-hostpath"
+
+autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 20

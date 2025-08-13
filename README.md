@@ -1,180 +1,292 @@
-# Despliegue de n8n en Kubernetes
+# n8n en Kubernetes
 
-## Prerrequisitos
+Este repositorio contiene configuraciones de Helm para desplegar n8n en Kubernetes, con configuraciones optimizadas para desarrollo local y producción.
 
-* **kubectl** - [Instalar kubectl](https://kubernetes.io/es/docs/tasks/tools/)
-* **helm** - [Instalar helm](https://helm.sh/docs/intro/install/)
-* **microk8s** (Desarrollo) - [Instalar microk8s](https://microk8s.io/)
+## 📁 Archivos de Configuración
 
-## 1. Despliegue usando Helm
+### 1. `values.yaml` - Configuración Local (Desarrollo)
+- **Uso**: Desarrollo local con acceso interno del cluster
+- **Servicio**: NodePort (puerto 5678)
+- **Base de datos**: PostgreSQL y Redis externos (Docker)
+- **Versión**: Última versión estable de n8n
+- **Características**: Configuración simple, autoscaling básico
 
-### Chart de Helm
-Utilizamos el chart oficial de n8n disponible en [Artifact Hub](https://artifacthub.io/packages/helm/open-8gears/n8n).
+### 2. `values-prod.yaml` - Configuración de Producción
+- **Uso**: Entorno de producción con alta disponibilidad
+- **Servicio**: ClusterIP + Ingress con SSL
+- **Base de datos**: PostgreSQL y Redis gestionados en K8s
+- **Versión**: Última versión estable de n8n
+- **Características**: SSL, autoscaling, múltiples réplicas, seguridad robusta
 
-### Configuración para Desarrollo
+## 🚀 Instalación Rápida
 
-Crea un archivo `values.yaml` con la siguiente configuración:
-
-```yaml
-# Configuración del servicio de n8n
-main:
-  service:
-    type: ClusterIP
-    port: 5678
-
-config:
-  DB_TYPE: "postgresdb"
-  DB_POSTGRESDB_HOST: "host.docker.internal"
-  DB_POSTGRESDB_DATABASE: "n8n"
-  DB_POSTGRESDB_USER: "n8n"
-  GENERIC_HOST: "localhost:5678"
-  N8N_HOST: "localhost:5678"
-  N8N_PROTOCOL: "http"
-  REDIS_HOST: "host.docker.internal"
-  REDIS_PORT: 6379
-
-secret:
-  DB_POSTGRESDB_PASSWORD: "my-secret-password" # ¡Cámbialo!
-  REDIS_PASSWORD: "my-redis-password" # ¡Cámbialo!
-
-persistence:
-  enabled: true
-  size: 10Gi
-  accessMode: ReadWriteOnce
-  storageClass: "microk8s-hostpath"
-```
-
-### Instalación con Helm
+### Usando Make (Recomendado)
 
 ```bash
-helm install my-n8n oci://8gears.container-registry.com/library/n8n --version 1.0.0
+# Ver todos los comandos disponibles
+make help
+
+# Configurar entorno de desarrollo
+make dev-setup
+
+# Instalar n8n local
+make install-local
+
+# Ver estado
+make status
+
+# Ver logs
+make logs
+
+# Port-forward para acceso local
+make port-forward
 ```
 
-### Configuración para Producción
-
-Para entornos de producción, utiliza esta configuración más robusta:
-
-```yaml
-main:
-  service:
-    type: ClusterIP
-    port: 5678
-  
-  config:
-    DB_TYPE: "postgresdb"
-    DB_POSTGRESDB_HOST: "aqui-va-el-hostname-de-tu-rds..."
-    DB_POSTGRESDB_DATABASE: "n8n"
-    DB_POSTGRESDB_USER: "n8n"
-    DB_POSTGRESDB_PORT: 5432
-    REDIS_HOST: "aqui-va-el-hostname-de-tu-elasticache..."
-    REDIS_PORT: 6379
-  
-  secret:
-    DB_POSTGRESDB_PASSWORD: "aqui-va-la-contrasena-segura-de-rds"
-    REDIS_PASSWORD: "aqui-va-la-contrasena-segura-de-redis"
-
-postgresql:
-  enabled: false
-
-redis:
-  enabled: false
-
-ingress:
-  enabled: true
-  className: "nginx"
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: "letsencrypt-staging"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
-  hosts:
-    - host: "n8n.tu-dominio.com"
-      paths:
-        - path: /
-          pathType: Prefix
-          serviceName: n8n-n8n
-          servicePort: 5678
-```
-
-## 2. Instalación de Ingress Controller y Cert-Manager
-
-El Ingress Controller gestionará el tráfico externo, mientras que Cert-Manager obtendrá certificados SSL/TLS automáticamente para habilitar HTTPS.
-
-### Agregar repositorio de Helm
+### Para Producción
 
 ```bash
-helm repo add jetstack https://charts.jetstack.io
-helm repo update
+# Configurar entorno de producción
+make prod-setup
+
+# Editar .env con tus valores reales
+nano .env
+
+# Validar configuración
+make validate-env
+
+# Instalar n8n en producción
+make install-prod
 ```
 
-### Instalar Cert-Manager
+## 🔧 Configuración con Variables de Entorno
+
+### 1. Configurar Variables
 
 ```bash
-helm install cert-manager jetstack/cert-manager \
-  --namespace cert-manager \
-  --create-namespace \
-  --version v1.15.1 \
-  --set installCRDs=true
+# Copiar archivo de ejemplo
+cp env.example .env
+
+# Editar con tus valores reales
+nano .env
 ```
 
-## 3. Configuración del ClusterIssuer
-
-Crea un archivo `letsencrypt-issuer.yaml` que le indica a Cert-Manager cómo solicitar certificados a Let's Encrypt:
-
-```yaml
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-staging
-spec:
-  acme:
-    email: tu-email@dominio.com
-    server: https://acme-staging-v02.api.letsencrypt.org/directory
-    privateKeySecretRef:
-      name: letsencrypt-staging
-    solvers:
-      - http01:
-          ingress:
-            class: nginx
-```
-
-### Aplicar el ClusterIssuer
+### 2. Variables Críticas a Configurar
 
 ```bash
-kubectl apply -f letsencrypt-issuer.yaml
+# Dominio y SSL
+N8N_DOMAIN=n8n.tudominio.com
+N8N_EMAIL=tu-email@tudominio.com
+
+# Base de datos
+DB_PASSWORD=tu-password-postgres-seguro
+REDIS_PASSWORD=tu-password-redis-seguro
+
+# Seguridad
+N8N_ENCRYPTION_KEY=tu-clave-de-32-caracteres
+N8N_ADMIN_PASSWORD=tu-password-admin-seguro
+
+# Storage
+STORAGE_CLASS=fast-ssd
 ```
 
-## 4. Despliegue de n8n y Configuración de DNS
-
-### Instalación de n8n
+### 3. Generar Configuración
 
 ```bash
-helm install n8n oci://8gears.container-registry.com/library/n8n \
-  --version 1.0.10
+# Generar values-prod.yaml desde .env
+make generate-prod
+
+# O manualmente
+./generate-prod-config.sh
 ```
 
-### Configuración de DNS
+## 🗄️ Bases de Datos
 
-> [!NOTE]
-> **Acción Requerida:** Configurar DNS
-> 
-> 1. Obtén la IP externa del Ingress:
->    ```bash
->    kubectl get services -n default
->    ```
-> 
-> 2. Ve a tu proveedor de DNS (ej. Amazon Route 53) y crea un registro `A` que apunte `n8n.tu-dominio.com` a esa IP.
+### Para Desarrollo Local
 
-## 5. Configuración de Autoescalado (HPA)
+#### PostgreSQL
+```bash
+docker run --name postgres-n8n \
+  -e POSTGRES_PASSWORD=441377 \
+  -e POSTGRES_USER=n8n \
+  -e POSTGRES_DB=n8n \
+  -p 5432:5432 \
+  -d postgres:15
+```
 
-Para que n8n pueda manejar picos de tráfico, configuraremos un Horizontal Pod Autoscaler (HPA). Este componente de Kubernetes creará o eliminará réplicas de n8n automáticamente según el uso de CPU.
+#### Redis
+```bash
+docker run --name redis-n8n \
+  -e REDIS_PASSWORD=441377 \
+  -p 6379:6379 \
+  -d redis:7-alpine
+```
 
-### Crear el HPA
+### Para Producción
+- Usar servicios gestionados (AWS RDS, GCP Cloud SQL, Azure Database)
+- O crear deployments separados de PostgreSQL y Redis en el cluster
+
+## ⚙️ Configuración Manual
+
+### Variables Importantes a Cambiar
+
+#### En `values-prod.yaml`:
+- `n8n.tudominio.com` → Tu dominio real
+- `your-32-character-encryption-key-here` → Clave de encriptación segura
+- `tu-password-postgres-seguro` → Contraseña PostgreSQL segura
+- `tu-password-redis-seguro` → Contraseña Redis segura
+- `tu-password-admin-seguro` → Contraseña de administrador
+- `fast-ssd` → Tu storage class de producción
+
+#### En `values.yaml`:
+- `microk8s-hostpath` → Tu storage class local
+- Contraseñas de base de datos (opcional para desarrollo)
+
+### Storage Classes
+
+#### MicroK8s
+```bash
+microk8s enable storage
+# Usar: microk8s-hostpath
+```
+
+#### Minikube
+```bash
+# Usar: standard
+```
+
+#### Otros clusters
+```bash
+kubectl get storageclass
+# Usar el que corresponda a tu cluster
+```
+
+## 🔒 Seguridad
+
+### Para Desarrollo
+- Autenticación básica deshabilitada
+- Logs en modo debug
+- Recursos mínimos
+- Acceso directo sin SSL
+
+### Para Producción
+- Autenticación básica habilitada
+- SSL/TLS obligatorio
+- Logs en modo info
+- Recursos limitados y requests
+- Pods ejecutándose como usuario no-root
+- Clave de encriptación configurada
+
+## 📊 Monitoreo y Gestión
+
+### Comandos Útiles
 
 ```bash
-kubectl autoscale deployment/n8n-n8n \
-  --cpu-percent=70 \
-  --min=2 \
-  --max=10
+# Ver estado completo
+make status
+
+# Ver logs en tiempo real
+make logs
+
+# Port-forward para acceso local
+make port-forward
+
+# Desinstalar
+make uninstall-local    # Para desarrollo
+make uninstall-prod     # Para producción
+
+# Limpiar archivos generados
+make clean
 ```
 
-El HPA mantendrá un mínimo de 2 réplicas para alta disponibilidad y escalará hasta un máximo de 10 según la utilización de CPU.
+### Ver Estado Manual
+
+```bash
+# Ver pods
+kubectl get pods
+
+# Ver servicios
+kubectl get svc
+
+# Ver ingress (solo producción)
+kubectl get ingress
+
+# Ver eventos
+kubectl get events --sort-by=.metadata.creationTimestamp
+```
+
+## 🔄 Actualizaciones
+
+### Actualizar n8n
+```bash
+# Cambiar tag en values.yaml
+helm upgrade n8n-local . -f values.yaml
+```
+
+### Actualizar configuración
+```bash
+# Aplicar cambios en values
+helm upgrade n8n-local . -f values.yaml
+```
+
+## 🗑️ Desinstalación
+
+```bash
+# Desinstalar release
+make uninstall-local
+
+# Limpiar PVCs (opcional)
+kubectl delete pvc -l app.kubernetes.io/instance=n8n-local
+```
+
+## 🐛 Troubleshooting
+
+### Problemas Comunes
+
+#### Pod no inicia
+```bash
+# Ver detalles del pod
+kubectl describe pod <pod-name>
+
+# Ver logs
+kubectl logs <pod-name>
+```
+
+#### Problemas de conectividad a base de datos
+- Verificar que PostgreSQL y Redis estén corriendo
+- Verificar credenciales en secrets
+- Verificar configuración de red
+
+#### Problemas de persistencia
+- Verificar storage class disponible
+- Verificar permisos de PVC
+
+### Validar Configuración
+
+```bash
+# Validar variables de entorno
+make validate-env
+
+# Ver estado del deployment
+make status
+```
+
+## 📚 Recursos Adicionales
+
+- [Documentación oficial de n8n](https://docs.n8n.io/)
+- [Chart de Helm n8n](https://github.com/8gears/n8n-helm-chart)
+- [Documentación de Kubernetes](https://kubernetes.io/docs/)
+- [Documentación de Helm](https://helm.sh/docs/)
+
+## 🤝 Contribuciones
+
+Las contribuciones son bienvenidas. Por favor:
+
+1. Fork el repositorio
+2. Crea una rama para tu feature
+3. Commit tus cambios
+4. Push a la rama
+5. Abre un Pull Request
+
+## 📄 Licencia
+
+Este proyecto está bajo la licencia MIT.

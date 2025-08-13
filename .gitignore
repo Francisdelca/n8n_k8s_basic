@@ -1,0 +1,38 @@
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de Helm
+*.tgz
+charts/
+.helmignore
+
+# Archivos de Kubernetes
+*.yaml.bak
+*.yaml.old
+
+# Archivos de logs
+*.log
+
+# Archivos temporales
+*.tmp
+*.temp
+
+# Archivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Archivos de backup
+*.backup
+*.bak
+
+# Archivos de configuración local
+.env
+.env.local
+.env.production
+
+# Archivos de secrets (por seguridad)
+*-secrets.yaml
+secrets.yaml
